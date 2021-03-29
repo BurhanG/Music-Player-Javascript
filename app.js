@@ -15,6 +15,7 @@ let musicPlayer = {
     songs: ['Save Your Tears', 'rapgod', 'The Lazy Song'],
     isPlaying: false,
     songIndex: 1,
+    currentTime: null,
     currentSong() {
         return this.songs[this.songIndex];
     },
@@ -24,10 +25,12 @@ let musicPlayer = {
         audio.src = `music/${song}.mp3`;
     },
     playSong() {
+        this.loadSong();
         musicContainer.classList.add('play');
         playBtn.querySelector('i.fas').classList.remove('fa-play');
         playBtn.querySelector('i.fas').classList.add('fa-pause');
 
+        if (this.currentTime) audio.currentTime = this.currentTime;
         audio.play();
         this.isPlaying = true;
     },
@@ -39,10 +42,13 @@ let musicPlayer = {
         audio.pause();
 
         this.isPlaying = false;
-        deleteCookie('timePlayed');
+
     },
     prevSong() {
+        console.log('aaa', this);
         this.songIndex--;
+        this.currentTime = null;
+
         if (this.songIndex < 0) {
             this.songIndex = this.songs.length - 1;
         }
@@ -51,30 +57,40 @@ let musicPlayer = {
     },
     nextSong() {
         this.songIndex++;
+        this.currentTime = null;
+
         if (this.songIndex > this.songs.length - 1) {
             this.songIndex = 0;
         }
-        loadSong();
-        playSong();
+        this.loadSong();
+        this.playSong();
+    },
+    setStorageMusicInfo() {
+        playedSong = {
+            songs: this.songs,
+            isPlaying: this.isPlaying,
+            songIndex: this.songIndex,
+            currentTime: this.currentTime
+        }
+        setStorage('playedSong', playedSong);
+        // console.log(getStorage('playedSong')[0]);
     }
 
 
 
 }
 
-//Load song details into Dom
-musicPlayer.loadSong();
-
 
 
 //update progress bar
 function updateProgress(e) {
     const { duration, currentTime } = e.srcElement;
-    // console.log('duration currentTime', duration, currentTime)
+    musicPlayer.currentTime = currentTime;
+
     let progressPercent = (currentTime * 100) / duration;
-    // console.log('progressPercent', progressPercent)
     progress.style.width = `${progressPercent}%`;
-    // if (played) setCookie('timePlayed', currentTime);
+
+    musicPlayer.setStorageMusicInfo()
 }
 
 // set progress bar
@@ -86,45 +102,34 @@ function setProgress(e) {
     audio.currentTime = (clickX / width) * duration;
 }
 
-//set cookie for audio time
-function setCookie(c_name, value, exdays) {
-    var exdate = new Date();
-    exdate.setDate(exdate.getDate() + exdays);
-    var c_value = escape(value) + ((exdays == null) ? "" : "; expires=" + exdate.toUTCString());
-    document.cookie = c_name + "=" + c_value;
-}
-
-//get cookie for audio time
-function getCookie(c_name) {
-    var i, x, y, ARRcookies = document.cookie.split(";");
-    for (i = 0; i < ARRcookies.length; i++) {
-        x = ARRcookies[i].substr(0, ARRcookies[i].indexOf("="));
-        y = ARRcookies[i].substr(ARRcookies[i].indexOf("=") + 1);
-        x = x.replace(/^\s+|\s+$/g, "");
-        if (x == c_name) {
-            return unescape(y);
-        }
+function onLocalStorageEvent(e) {
+    if (e.key == "openpages") {
+        // Listen if anybody else is opening the same page!
+        localStorage.page_available = Date.now();
+        musicPlayer.pauseSong();
+        console.log('1.sayfa');
     }
-}
-function deleteCookie(c_name) {
-    console.log(delete worked);
-    document.cookie = c_name + '=; Max-Age=-99999999;';
-}
+    if (e.key == "page_available") {
+        console.log('2.sayfa');
+    }
+};
 
 
-
-//Event Lsitener
+/*---- Event Listeners ----*/
 playBtn.addEventListener('click', () => {
     musicPlayer.isPlaying ? musicPlayer.pauseSong() : musicPlayer.playSong();
 });
 
 // change song
-prevBtn.addEventListener('click', musicPlayer.prevSong);
-nextBtn.addEventListener('click', musicPlayer.nextSong);
+prevBtn.addEventListener('click', () => {
+    musicPlayer.prevSong();
+});
+nextBtn.addEventListener('click', () => {
+    musicPlayer.nextSong();
+});
 
 // Time and song Update
 audio.addEventListener('timeupdate', updateProgress);
-
 
 //click on progressbar
 progressContainer.addEventListener('click', setProgress);
@@ -132,37 +137,30 @@ progressContainer.addEventListener('click', setProgress);
 //song ends 
 audio.addEventListener('ended', musicPlayer.nextSong)
 
-checkPlayedBefore = () => {
-    localStorage.openpages = Date.now();
+//when page opened
+window.addEventListener('storage', onLocalStorageEvent, false);
 
+
+
+checkPlayedBefore = () => {
+    setStorage('openpages', Date.now());
+
+    //Load song details into Dom
+    musicPlayer.loadSong();
+
+    storedSong = getStorage('playedSong')[0];
+    console.log(storedSong);
+    musicPlayer.songIndex = storedSong.songIndex;
+    musicPlayer.currentTime = storedSong.currentTime;
+
+    if (storedSong && storedSong.isPlaying) {
+        console.log('evvet');
+        musicPlayer.playSong();
+    }
 
     console.log('checkPlayedBefore worked');
-    console.log('windowUpdated', windowUpdated());
-    let currentTime = getCookie('timePlayed');
-    let duration = getCookie('duration');
 
-    console.log('current time', currentTime);
-    console.log('duration', duration);
-    if (currentTime) {
-
-        audio.currentTime = currentTime;
-        playSong();
-
-        let progressPercent = (currentTime * 100) / duration;
-        progress.style.width = `${progressPercent}%`;
-    }
 }
 checkPlayedBefore();
 
 
-var onLocalStorageEvent = function (e) {
-    console.log('e', e);
-    if (e.key == "openpages") {
-        // Listen if anybody else is opening the same page!
-        localStorage.page_available = Date.now();
-    }
-    if (e.key == "page_available") {
-        alert("One more page already open");
-    }
-};
-window.addEventListener('storage', onLocalStorageEvent, false);
